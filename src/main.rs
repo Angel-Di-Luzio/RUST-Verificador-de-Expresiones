@@ -1,4 +1,6 @@
+use std::env;
 use std::fs;
+use std::io::{self, Write};
 use std::process;
 
 const MAX: usize = 50;
@@ -269,8 +271,79 @@ fn infija_a_prefija(tokens: &[Token], cantidad: usize) -> String {
     salida.chars().rev().collect()
 }
 
+/// Busca archivos .txt en el directorio actual.
+fn buscar_archivos_txt() -> Vec<String> {
+    let mut archivos: Vec<String> = Vec::new();
+    if let Ok(entradas) = fs::read_dir(".") {
+        for entrada in entradas.flatten() {
+            if let Some(nombre) = entrada.file_name().to_str() {
+                if nombre.ends_with(".txt") {
+                    archivos.push(nombre.to_string());
+                }
+            }
+        }
+    }
+    archivos.sort();
+    archivos
+}
+
+/// Determina qué archivo .txt usar: argumento de CLI, selección del usuario, o el único disponible.
+fn obtener_archivo() -> String {
+    let args: Vec<String> = env::args().collect();
+
+    // Si se pasó un argumento, usarlo directamente
+    if args.len() > 1 {
+        let ruta = &args[1];
+        if !ruta.ends_with(".txt") {
+            eprintln!("Advertencia: el archivo '{}' no tiene extension .txt.", ruta);
+        }
+        return ruta.clone();
+    }
+
+    // Buscar archivos .txt en el directorio actual
+    let archivos = buscar_archivos_txt();
+
+    match archivos.len() {
+        0 => {
+            eprintln!("Error: no se encontraron archivos .txt en el directorio actual.");
+            eprintln!("Uso: cargo run -- <archivo.txt>");
+            process::exit(1);
+        }
+        1 => {
+            println!("Archivo encontrado: {}", archivos[0]);
+            println!();
+            archivos[0].clone()
+        }
+        _ => {
+            println!("Se encontraron varios archivos .txt:");
+            println!();
+            for (i, archivo) in archivos.iter().enumerate() {
+                println!("  [{}] {}", i + 1, archivo);
+            }
+            println!();
+            print!("Seleccione un archivo (1-{}): ", archivos.len());
+            io::stdout().flush().unwrap();
+
+            let mut entrada = String::new();
+            io::stdin().read_line(&mut entrada).unwrap();
+
+            let seleccion: usize = match entrada.trim().parse() {
+                Ok(n) if n >= 1 && n <= archivos.len() => n,
+                _ => {
+                    eprintln!("Error: seleccion invalida.");
+                    process::exit(1);
+                }
+            };
+
+            println!();
+            archivos[seleccion - 1].clone()
+        }
+    }
+}
+
 fn main() {
-    let (expresion, tabla) = leer_archivo("entrada.txt");
+    let archivo = obtener_archivo();
+    let (expresion, tabla) = leer_archivo(&archivo);
 
     let (tokens, cantidad) = tokenizar(&expresion, &tabla);
 
@@ -284,3 +357,4 @@ fn main() {
     let prefija = infija_a_prefija(&tokens, cantidad);
     println!("Expresion prefija:  {}", prefija);
 }
+
